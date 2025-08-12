@@ -1,0 +1,24 @@
+# Arquivos para NÃO incluir no deploy
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+.env
+
+# Dados locais - NÃO fazer upload
+relatorios.db
+data/
+*.pdf
+
+# Secrets locais - configurar no Streamlit Cloud
+.streamlit/secrets.toml
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
