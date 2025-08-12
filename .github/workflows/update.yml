@@ -1,1 +1,37 @@
+name: Update Dashboard
+
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install requirements
+      run: pip install -r requirements.txt
+        
+    - name: Create env file
+      run: |
+        echo "GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}" > .env
+        echo "GMAIL_PASSWORD=${{ secrets.GMAIL_PASSWORD }}" >> .env
+        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+        echo "SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" >> .env
+        
+    - name: Run email processing
+      run: python -c "from utils.email_utils import baixar_pdfs_gmail; print('Email processing completed')"
+        
+    - name: Clean up
+      run: rm -f .env
 
