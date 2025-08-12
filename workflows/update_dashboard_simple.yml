@@ -1,0 +1,108 @@
+name: Update Dashboard
+
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Configure environment
+      env:
+        GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+        GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      run: |
+        echo "GMAIL_EMAIL=${GMAIL_EMAIL}" >> .env
+        echo "GMAIL_PASSWORD=${GMAIL_PASSWORD}" >> .env
+        echo "SUPABASE_URL=${SUPABASE_URL}" >> .env
+        echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}" >> .env
+        echo "SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}" >> .env
+        
+    - name: Download PDFs
+      run: |
+        python -c "
+        from utils.email_utils import baixar_pdfs_gmail
+        from datetime import datetime, timedelta
+        
+        data_inicio = (datetime.now() - timedelta(days=3)).strftime('%d/%m/%Y')
+        data_fim = datetime.now().strftime('%d/%m/%Y')
+        
+        emails_baixados = baixar_pdfs_gmail(
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            pasta_destino='pdfs_baixados'
+        )
+        
+        print(f'{len(emails_baixados)} emails processed')
+        "
+        
+    - name: Process RDS PDFs
+      run: |
+        python -c "
+        import os
+        import glob
+        from extrair_rds import extrair_dados_rds
+        from utils.database import insert_data
+        
+        pdfs_rds = glob.glob('pdfs_baixados/**/RDS*.pdf', recursive=True)
+        
+        for pdf_path in pdfs_rds:
+            try:
+                dados = extrair_dados_rds(pdf_path)
+                if dados:
+                    for linha in dados:
+                        insert_data('rds_vendas', linha)
+                    print(f'{len(dados)} RDS records inserted')
+            except Exception as e:
+                print(f'Error processing {pdf_path}: {str(e)}')
+        "
+        
+    - name: Process Chart PDFs
+      run: |
+        python -c "
+        import os
+        import glob
+        from extrair_chart_total_real import extrair_dados_chart_com_totais_reais
+        from utils.database import insert_data
+        
+        pdfs_chart = glob.glob('pdfs_baixados/**/Chart*.pdf', recursive=True)
+        
+        for pdf_path in pdfs_chart:
+            try:
+                dados = extrair_dados_chart_com_totais_reais(pdf_path)
+                if dados:
+                    for linha in dados:
+                        insert_data('chart_compradores_duplo', linha)
+                    print(f'{len(dados)} Chart records inserted')
+            except Exception as e:
+                print(f'Error processing Chart {pdf_path}: {str(e)}')
+        "
+        
+    - name: Cleanup
+      run: |
+        rm -rf pdfs_baixados
+        rm -f .env
+        
+    - name: Complete
+      run: |
+        echo "Dashboard update completed!"
+        echo "Date: $(date)"
