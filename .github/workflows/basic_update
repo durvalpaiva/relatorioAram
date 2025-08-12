@@ -1,0 +1,37 @@
+name: Daily Dashboard Update
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # 06:00 AM Brasil (UTC-3)
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Setup environment
+      run: |
+        echo "GMAIL_EMAIL=${{ secrets.GMAIL_EMAIL }}" >> .env
+        echo "GMAIL_PASSWORD=${{ secrets.GMAIL_PASSWORD }}" >> .env
+        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+        echo "SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" >> .env
+        
+    - name: Update dashboard data
+      run: |
+        python utils/email_utils.py
+        
+    - name: Cleanup
+      run: |
+        rm -f .env
